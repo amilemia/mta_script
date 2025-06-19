@@ -161,6 +161,7 @@ function saveAttachments()
             xmlNodeSetAttribute(node, "sz", tostring(sz))
         end
     end
+  
     if xmlSaveFile(xml) then
         outputChatBox("Attachment setup saved.")
     else
@@ -180,7 +181,11 @@ function loadAttachments()
         return
     end
     local veh = getPedOccupiedVehicle(localPlayer)
-    if not veh then outputChatBox("You must be in a vehicle.") return end
+    if not veh then
+        outputChatBox("You must be in a vehicle.")
+        xmlUnloadFile(xml)
+        return
+    end
 
     for _, node in ipairs(xmlNodeGetChildren(xml)) do
         local id = tonumber(xmlNodeGetAttribute(node, "id"))
