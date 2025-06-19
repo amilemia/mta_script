@@ -211,6 +211,18 @@ function loadAttachments()
         attachElements(obj, veh, x, y, z, rx, ry, rz)
         setObjectScale(obj, sx, sy, sz)
         table.insert(attachedObjects, obj)
+        table.insert(attachments, {
+            id = id,
+            x = x,
+            y = y,
+            z = z,
+            rx = rx,
+            ry = ry,
+            rz = rz,
+            sx = sx,
+            sy = sy,
+            sz = sz
+        })
     end
     xmlUnloadFile(xml)
     triggerServerEvent("loadVehicleAttachments", resourceRoot, veh, attachments)
