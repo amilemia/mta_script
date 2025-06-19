@@ -3,11 +3,19 @@ local favoriteObjects = {}
 local attachedObjects = {}
 local selectedObject = nil
 local lastClickTime = 0
+local MAX_ATTACHMENTS = 10
+
+local pageSize = 100
+local currentPage = 1
+local allObjects = {}
 
 local screenW, screenH = guiGetScreenSize()
 local window = guiCreateWindow(screenW/2 - 200, screenH/2 - 250, 400, 500, "Attach Object to Vehicle", false)
-local objectList = guiCreateGridList(0.05, 0.1, 0.9, 0.6, true, window)
-local attachBtn = guiCreateButton(0.1, 0.71, 0.8, 0.08, "Attach to Vehicle", true, window)
+local objectList = guiCreateGridList(0.05, 0.12, 0.9, 0.6, true, window)
+local prevBtn = guiCreateButton(0.05, 0.08, 0.2, 0.04, "<", true, window)
+local pageLabel = guiCreateLabel(0.4, 0.08, 0.2, 0.04, "", true, window)
+local nextBtn = guiCreateButton(0.75, 0.08, 0.2, 0.04, ">", true, window)
+local attachBtn = guiCreateButton(0.1, 0.74, 0.8, 0.08, "Attach to Vehicle", true, window)
 local saveBtn = guiCreateButton(0.1, 0.80, 0.35, 0.08, "Save Setup", true, window)
 local loadBtn = guiCreateButton(0.55, 0.80, 0.35, 0.08, "Load Setup", true, window)
 local closeBtn = guiCreateButton(0.1, 0.89, 0.8, 0.08, "Close", true, window)
@@ -17,17 +25,34 @@ guiSetVisible(window, false)
 
 guiGridListAddColumn(objectList, "Object ID", 0.9)
 
--- Load all usable object model IDs from 1000 to 20000
+-- Cache all usable object model IDs and populate the first page
 for i = 1000, 20000 do
     if engineGetModelNameFromID(i) then
-        local row = guiGridListAddRow(objectList)
-        guiGridListSetItemText(objectList, row, 1, tostring(i), false, false)
+        table.insert(allObjects, i)
     end
 end
+
+local function updateObjectList()
+    guiGridListClear(objectList)
+    local totalPages = math.max(1, math.ceil(#allObjects / pageSize))
+    if currentPage > totalPages then currentPage = totalPages end
+    local start = (currentPage - 1) * pageSize + 1
+    local finish = math.min(start + pageSize - 1, #allObjects)
+    for idx = start, finish do
+        local row = guiGridListAddRow(objectList)
+        guiGridListSetItemText(objectList, row, 1, tostring(allObjects[idx]), false, false)
+    end
+    guiSetText(pageLabel, string.format("Page %d/%d", currentPage, totalPages))
+end
+
+updateObjectList()
 
 bindKey("F7", "down", function()
     if getPedOccupiedVehicle(localPlayer) then
         guiSetVisible(window, not guiGetVisible(window))
+        if guiGetVisible(window) then
+            updateObjectList()
+        end
         showCursor(guiGetVisible(window))
     else
         outputChatBox("You must be in a vehicle to use this menu.", 255, 0, 0)
@@ -37,13 +62,31 @@ end)
 -- Attach button
 addEventHandler("onClientGUIClick", root, function()
     if source == attachBtn then
+        if #attachedObjects >= MAX_ATTACHMENTS then
+            outputChatBox("Attachment limit reached.", 255, 0, 0)
+            return
+        end
         local row = guiGridListGetSelectedItem(objectList)
         if row ~= -1 then
             local objID = tonumber(guiGridListGetItemText(objectList, row, 1))
+            if not engineGetModelNameFromID(objID) then
+                outputChatBox("Invalid object ID.", 255, 0, 0)
+                return
+            end
             local veh = getPedOccupiedVehicle(localPlayer)
             if veh and objID then
-                triggerServerEvent("attachObjectToVehicle", resourceRoot, veh, objID)
+                triggerServerEvent("attachObjectToVehicle", resourceRoot, veh, objID, 0, 0, 1)
             end
+        end
+    elseif source == prevBtn then
+        if currentPage > 1 then
+            currentPage = currentPage - 1
+            updateObjectList()
+        end
+    elseif source == nextBtn then
+        if currentPage < math.ceil(#allObjects / pageSize) then
+            currentPage = currentPage + 1
+            updateObjectList()
         end
     elseif source == saveBtn then
         saveAttachments()
@@ -74,14 +117,37 @@ addEventHandler("onObjectAttached", resourceRoot, function(obj)
     selectedObject = obj
 end)
 
+local function cleanupObjects()
+    for _, obj in ipairs(attachedObjects) do
+        if isElement(obj) then
+            destroyElement(obj)
+        end
+    end
+    attachedObjects = {}
+end
+
+addEventHandler("onClientElementDestroy", root, function()
+    if source == getPedOccupiedVehicle(localPlayer) then
+        cleanupObjects()
+    end
+end)
+
+addEventHandler("onClientResourceStop", resourceRoot, cleanupObjects)
+
 function saveAttachments()
     if fileExists(xmlFile) then fileDelete(xmlFile) end
     local xml = xmlCreateFile(xmlFile, "attachments")
+    if not xml then
+        outputChatBox("Failed to create attachment file.", 255, 0, 0)
+        return
+    end
     for _, obj in ipairs(attachedObjects) do
         if isElement(obj) then
             local id = getElementModel(obj)
             local x, y, z, rx, ry, rz = getElementAttachedOffsets(obj)
-            local scale = getObjectScale(obj)
+            local sx, sy, sz = getObjectScale(obj)
+            sy = sy or sx
+            sz = sz or sx
             local node = xmlCreateChild(xml, "object")
             xmlNodeSetAttribute(node, "id", tostring(id))
             xmlNodeSetAttribute(node, "x", tostring(x))
@@ -90,11 +156,17 @@ function saveAttachments()
             xmlNodeSetAttribute(node, "rx", tostring(rx))
             xmlNodeSetAttribute(node, "ry", tostring(ry))
             xmlNodeSetAttribute(node, "rz", tostring(rz))
-            xmlNodeSetAttribute(node, "scale", tostring(scale))
+            xmlNodeSetAttribute(node, "sx", tostring(sx))
+            xmlNodeSetAttribute(node, "sy", tostring(sy))
+            xmlNodeSetAttribute(node, "sz", tostring(sz))
         end
     end
-    xmlSaveFile(xml)
-    outputChatBox("Attachment setup saved.")
+    if xmlSaveFile(xml) then
+        outputChatBox("Attachment setup saved.")
+    else
+        outputChatBox("Failed to save attachment file.", 255, 0, 0)
+    end
+    xmlUnloadFile(xml)
 end
 
 function loadAttachments()
@@ -103,6 +175,10 @@ function loadAttachments()
         return
     end
     local xml = xmlLoadFile(xmlFile)
+    if not xml then
+        outputChatBox("Failed to load attachment file.", 255, 0, 0)
+        return
+    end
     local veh = getPedOccupiedVehicle(localPlayer)
     if not veh then outputChatBox("You must be in a vehicle.") return end
 
@@ -114,10 +190,12 @@ function loadAttachments()
         local rx = tonumber(xmlNodeGetAttribute(node, "rx"))
         local ry = tonumber(xmlNodeGetAttribute(node, "ry"))
         local rz = tonumber(xmlNodeGetAttribute(node, "rz"))
-        local scale = tonumber(xmlNodeGetAttribute(node, "scale"))
+        local sx = tonumber(xmlNodeGetAttribute(node, "sx")) or 1
+        local sy = tonumber(xmlNodeGetAttribute(node, "sy")) or sx
+        local sz = tonumber(xmlNodeGetAttribute(node, "sz")) or sx
         local obj = createObject(id, 0, 0, 0)
         attachElements(obj, veh, x, y, z, rx, ry, rz)
-        setObjectScale(obj, scale)
+        setObjectScale(obj, sx, sy, sz)
         table.insert(attachedObjects, obj)
     end
     xmlUnloadFile(xml)
