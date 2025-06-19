@@ -1,13 +1,15 @@
 local xmlFile = "attachments.xml"
 local favoriteObjects = {}
 local attachedObjects = {}
-local selectedObject = nil
 local lastClickTime = 0
 local MAX_ATTACHMENTS = 10
 
 local pageSize = 100
 local currentPage = 1
 local allObjects = {}
+
+local saveAttachments
+local loadAttachments
 
 local screenW, screenH = guiGetScreenSize()
 local window = guiCreateWindow(screenW/2 - 200, screenH/2 - 250, 400, 500, "Attach Object to Vehicle", false)
@@ -40,7 +42,11 @@ local function updateObjectList()
     local finish = math.min(start + pageSize - 1, #allObjects)
     for idx = start, finish do
         local row = guiGridListAddRow(objectList)
-        guiGridListSetItemText(objectList, row, 1, tostring(allObjects[idx]), false, false)
+        local id = allObjects[idx]
+        guiGridListSetItemText(objectList, row, 1, tostring(id), false, false)
+        if favoriteObjects[id] then
+            guiGridListSetItemColor(objectList, row, 1, 255, 215, 0)
+        end
     end
     guiSetText(pageLabel, string.format("Page %d/%d", currentPage, totalPages))
 end
@@ -114,7 +120,6 @@ end)
 addEvent("onObjectAttached", true)
 addEventHandler("onObjectAttached", resourceRoot, function(obj)
     table.insert(attachedObjects, obj)
-    selectedObject = obj
 end)
 
 local function cleanupObjects()
@@ -134,7 +139,7 @@ end)
 
 addEventHandler("onClientResourceStop", resourceRoot, cleanupObjects)
 
-function saveAttachments()
+saveAttachments = function()
     if fileExists(xmlFile) then fileDelete(xmlFile) end
     local xml = xmlCreateFile(xmlFile, "attachments")
     if not xml then
@@ -161,7 +166,7 @@ function saveAttachments()
             xmlNodeSetAttribute(node, "sz", tostring(sz))
         end
     end
-  
+
     if xmlSaveFile(xml) then
         outputChatBox("Attachment setup saved.")
     else
@@ -170,7 +175,7 @@ function saveAttachments()
     xmlUnloadFile(xml)
 end
 
-function loadAttachments()
+loadAttachments = function()
     if not fileExists(xmlFile) then
         outputChatBox("No saved attachment found.")
         return
