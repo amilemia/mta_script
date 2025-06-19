@@ -2,5 +2,4 @@
     <info author="Generated" version="3.0" name="Vehicle Object Attacher Full" type="script"/>
     <script src="client.lua" type="client"/>
     <script src="server.lua" type="server"/>
-    <script src="gui.lua" type="client"/>
 </meta>
