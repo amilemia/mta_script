@@ -191,6 +191,7 @@ function loadAttachments()
         return
     end
 
+    local attachments = {}
     for _, node in ipairs(xmlNodeGetChildren(xml)) do
         if #attachedObjects >= MAX_ATTACHMENTS then
             outputChatBox("Attachment limit reached, some objects were not loaded.", 255, 0, 0)
@@ -212,5 +213,6 @@ function loadAttachments()
         table.insert(attachedObjects, obj)
     end
     xmlUnloadFile(xml)
+    triggerServerEvent("loadVehicleAttachments", resourceRoot, veh, attachments)
     outputChatBox("Attachments loaded.")
 end
