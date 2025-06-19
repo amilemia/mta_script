@@ -175,6 +175,10 @@ function loadAttachments()
         outputChatBox("No saved attachment found.")
         return
     end
+    if #attachedObjects >= MAX_ATTACHMENTS then
+        outputChatBox("Attachment limit reached.", 255, 0, 0)
+        return
+    end
     local xml = xmlLoadFile(xmlFile)
     if not xml then
         outputChatBox("Failed to load attachment file.", 255, 0, 0)
@@ -189,18 +193,24 @@ function loadAttachments()
 
     local attachments = {}
     for _, node in ipairs(xmlNodeGetChildren(xml)) do
-        table.insert(attachments, {
-            id = tonumber(xmlNodeGetAttribute(node, "id")),
-            x = tonumber(xmlNodeGetAttribute(node, "x")),
-            y = tonumber(xmlNodeGetAttribute(node, "y")),
-            z = tonumber(xmlNodeGetAttribute(node, "z")),
-            rx = tonumber(xmlNodeGetAttribute(node, "rx")),
-            ry = tonumber(xmlNodeGetAttribute(node, "ry")),
-            rz = tonumber(xmlNodeGetAttribute(node, "rz")),
-            sx = tonumber(xmlNodeGetAttribute(node, "sx")) or 1,
-            sy = tonumber(xmlNodeGetAttribute(node, "sy")),
-            sz = tonumber(xmlNodeGetAttribute(node, "sz")),
-        })
+        if #attachedObjects >= MAX_ATTACHMENTS then
+            outputChatBox("Attachment limit reached, some objects were not loaded.", 255, 0, 0)
+            break
+        end
+        local id = tonumber(xmlNodeGetAttribute(node, "id"))
+        local x = tonumber(xmlNodeGetAttribute(node, "x"))
+        local y = tonumber(xmlNodeGetAttribute(node, "y"))
+        local z = tonumber(xmlNodeGetAttribute(node, "z"))
+        local rx = tonumber(xmlNodeGetAttribute(node, "rx"))
+        local ry = tonumber(xmlNodeGetAttribute(node, "ry"))
+        local rz = tonumber(xmlNodeGetAttribute(node, "rz"))
+        local sx = tonumber(xmlNodeGetAttribute(node, "sx")) or 1
+        local sy = tonumber(xmlNodeGetAttribute(node, "sy")) or sx
+        local sz = tonumber(xmlNodeGetAttribute(node, "sz")) or sx
+        local obj = createObject(id, 0, 0, 0)
+        attachElements(obj, veh, x, y, z, rx, ry, rz)
+        setObjectScale(obj, sx, sy, sz)
+        table.insert(attachedObjects, obj)
     end
     xmlUnloadFile(xml)
     triggerServerEvent("loadVehicleAttachments", resourceRoot, veh, attachments)
