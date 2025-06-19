@@ -9,6 +9,8 @@ addEventHandler("attachObjectToVehicle", resourceRoot, function(veh, modelID, ox
     ox, oy, oz = tonumber(ox) or 0, tonumber(oy) or 0, tonumber(oz) or 0
 
     local obj = createObject(modelID, 0, 0, 0)
+    setElementDimension(obj, getElementDimension(veh))
+    setElementInterior(obj, getElementInterior(veh))
     attachElements(obj, veh, ox, oy, oz)
 
     vehicleAttachments[veh] = vehicleAttachments[veh] or {}
