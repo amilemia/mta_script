@@ -175,6 +175,10 @@ function loadAttachments()
         outputChatBox("No saved attachment found.")
         return
     end
+    if #attachedObjects >= MAX_ATTACHMENTS then
+        outputChatBox("Attachment limit reached.", 255, 0, 0)
+        return
+    end
     local xml = xmlLoadFile(xmlFile)
     if not xml then
         outputChatBox("Failed to load attachment file.", 255, 0, 0)
@@ -188,6 +192,10 @@ function loadAttachments()
     end
 
     for _, node in ipairs(xmlNodeGetChildren(xml)) do
+        if #attachedObjects >= MAX_ATTACHMENTS then
+            outputChatBox("Attachment limit reached, some objects were not loaded.", 255, 0, 0)
+            break
+        end
         local id = tonumber(xmlNodeGetAttribute(node, "id"))
         local x = tonumber(xmlNodeGetAttribute(node, "x"))
         local y = tonumber(xmlNodeGetAttribute(node, "y"))
